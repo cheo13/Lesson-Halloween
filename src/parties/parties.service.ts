@@ -7,6 +7,21 @@ import { PrismaService } from "../prisma/prisma.service";
 export class PartiesService {
   constructor(private prisma: PrismaService) {}
 
+  //Six endpoint...
+  async getPartiesByDate(date: Date): Promise<CreatePartyDto[]> {
+    const parties = await this.prisma.party.findMany({
+      where: {
+        date: date,
+      },
+    });
+
+    if (!parties || parties.length === 0) {
+      throw new NotFoundException('No parties were found for the specified date.');
+    }
+
+    return parties;
+  }
+
   async createParty(createPartyDto: CreatePartyDto) {
     const party = await this.prisma.party.create({
       data: createPartyDto,
@@ -53,7 +68,10 @@ export class PartiesService {
     const deletedParty = await this.prisma.party.delete({
       where: { id },
     });
-
+    
+    if (!deletedParty) {
+      throw new NotFoundException(`Party with ID ${id} not found`);
+    }
     return deletedParty;
   }
 }

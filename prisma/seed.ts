@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Seed data for Costume
+ 
   const costume1 = await prisma.costume.create({
     data: {
       name: 'WereWolf Costume',
@@ -38,8 +38,6 @@ async function main() {
     },
   });
 
-
-  // Seed data for Attendee
   const attendee1 = await prisma.attendee.create({
     data: {
       dni: '12345678',
@@ -79,8 +77,6 @@ async function main() {
     },
   });
 
-
-  // Seed data for Party
   const party1 = await prisma.party.create({
     data: {
       name: 'Halloween Bash',

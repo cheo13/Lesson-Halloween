@@ -5,7 +5,14 @@ import { UpdatePartyDto } from './dto/update-party.dto';
 
 @Controller('parties')
 export class PartiesController {
-  constructor(private readonly partiesService: PartiesService) {}
+  constructor(private readonly partiesService: PartiesService) { }
+
+  //Six endpoint...
+  @Get(':date')
+  async getPartiesByDate(@Param('date') date: string) {
+    const parties = await this.partiesService.getPartiesByDate(new Date(date));
+    return parties;
+  }
 
   @Post()
   createParty(@Body() createPartyDto: CreatePartyDto) {

@@ -2,55 +2,57 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateAttendeeDto } from './dto/create-attendee.dto';
 import { UpdateAttendeeDto } from './dto/update-attendee.dto';
 import { PrismaService } from "../prisma/prisma.service";
-import { PurchaseCostumesDto } from './dto/purchase-costumes.dto';
 
 @Injectable()
 export class AttendeesService {
   constructor(private prisma: PrismaService) {}
-//Tercer endpoint...
-// En el servicio (attendees.service.ts)
-async purchaseCostumes(attendeeId: number, costumeIds: number[]) {
-  // Verifica si el asistente existe
-  const existingAttendee = await this.prisma.attendee.findUnique({
-    where: { id: attendeeId },
+
+  //Three endpoint...
+
+async purchaseCostumes() {
+  
+  const attendees = await this.prisma.attendee.findMany();
+  const costumes = await this.prisma.costume.findMany();
+
+  const costumeMap = new Map<number, any>();
+  costumes.forEach(costume => {
+    costumeMap.set(costume.id, costume);
   });
 
-  if (!existingAttendee) {
-    throw new NotFoundException(`No se encontró el asistente con ID ${attendeeId}.`);
-  }
+  const attendeesWithCostumes = attendees.map(attendee => {
+    const costumeId = attendee.id;
+    const costume = costumeMap.get(costumeId);
 
-  // Obtiene los disfraces seleccionados para la compra
-  const selectedCostumes = await this.prisma.costume.findMany({
-    where: {
-      id: {
-        in: costumeIds,
-      },
-    },
+    return {
+      attendee,
+      costume,
+    };
   });
 
-  // Realiza la compra asignando los disfraces al asistente
-  const purchasedAttendee = await this.prisma.attendee.update({
-    where: { id: attendeeId },
-    data: {
-      // Actualiza el dinero del asistente restando el precio total de los disfraces
-      money: {
-        decrement: selectedCostumes.reduce((total, costume) => total + costume.price, 0),
-      },
-    },
-  });
-
-  return purchasedAttendee;
+  return attendeesWithCostumes;
 }
 
+// Four endpoint....
 
-// Cuarto endpoint....
+async getAttendeesWithLowBudget() {
+  const attendeesWithLowBudget = await this.prisma.attendee.findMany({
+    where: {
+      money: {
+        lte: 200,
+      },
+    },
+  });
+
+  return attendeesWithLowBudget;
+}
+
 async incrementBudget(attendeeId: number, amount: number) {
   const existingAttendee = await this.prisma.attendee.findUnique({
     where: { id: attendeeId },
   });
 
   if (!existingAttendee) {
-    throw new NotFoundException(`No se encontró el asistente con ID ${attendeeId}.`);
+    throw new NotFoundException(`Assistant with ID not found ${attendeeId}.`);
   }
 
   const updatedAttendee = await this.prisma.attendee.update({
@@ -64,8 +66,10 @@ async incrementBudget(attendeeId: number, amount: number) {
 
   return updatedAttendee;
 }
-//Quinto endpoint...
-async reallocateFunds(senderId: number, receiverId: number) {
+
+//Five endpoint...
+
+async reallocateFunds(senderId: number, receiverId: number, amountToTransfer: number) {
   const senderAttendee = await this.prisma.attendee.findUnique({
     where: { id: senderId },
   });
@@ -75,21 +79,25 @@ async reallocateFunds(senderId: number, receiverId: number) {
   });
 
   if (!senderAttendee || !receiverAttendee) {
-    throw new NotFoundException('No se encontraron los asistentes.');
+    throw new NotFoundException('The attendees were not found...');
   }
 
-  if (senderAttendee.age >= 18 || receiverAttendee.age < 18) {
-    throw new Error('La transferencia de fondos solo es posible entre un asistente mayor de edad y un asistente menor de edad.');
+  if (senderAttendee.age < 18 || receiverAttendee.age >= 18) {
+    throw new Error('The transfer of funds is only possible between an adult attendee and a minor attendee.');
+  }
+  if (amountToTransfer <= 0) {
+    throw new Error('The amount to be transferred must be greater than zero.');
   }
 
-  const transferAmount = Math.min(senderAttendee.money, receiverAttendee.money);
+  if (amountToTransfer > senderAttendee.money) {
+    throw new Error('The sending assistant does not have enough funds to transfer that amount.');
+  }
 
-  if (transferAmount > 0) {
     await this.prisma.attendee.update({
       where: { id: senderId },
       data: {
         money: {
-          decrement: transferAmount,
+          decrement: amountToTransfer,
         },
       },
     });
@@ -98,15 +106,40 @@ async reallocateFunds(senderId: number, receiverId: number) {
       where: { id: receiverId },
       data: {
         money: {
-          increment: transferAmount,
+          increment: amountToTransfer,
         },
       },
     });
-  }
+  
 
-  return { message: 'Transferencia de fondos completada.' };
+  return { message: 'Fund transfer completed.' };
 }
 
+//Seven endpoint...
+
+async getAdultAttendees(): Promise<CreateAttendeeDto[]> {
+  const adultAttendees = await this.prisma.attendee.findMany({
+    where: {
+      age: {
+        gte: 18,
+      },
+    },
+  });
+
+  return adultAttendees;
+}
+
+//Eight endpoint...
+
+async getNervousAttendees(): Promise<CreateAttendeeDto[]> {
+  const nervousAttendees = await this.prisma.attendee.findMany({
+    where: {
+      isNervous: true,
+    },
+  });
+
+  return nervousAttendees;
+}
 
   async createAttendee(createAttendeeDto: CreateAttendeeDto) {
     const attendee = await this.prisma.attendee.create({
@@ -154,6 +187,9 @@ async reallocateFunds(senderId: number, receiverId: number) {
     const deletedAttendee = await this.prisma.attendee.delete({
       where: { id },
     });
+    if (!deletedAttendee) {
+      throw new NotFoundException(`Attendee with ID ${id} not found`);
+    }
 
     return deletedAttendee;
   }
